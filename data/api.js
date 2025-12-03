@@ -71,4 +71,4 @@ const generateFallbackAnalysis = (player1, player2) => {
     return `${player1.name} vs ${player2.name} - Compare their 2024 stats above to see who has the edge.`;
 };
 
-console.log('✅ Claude API module loaded (Concise Version)');
+console.log('Claude API module loaded (Concise Version)');

@@ -1,5 +1,5 @@
 /* ====================================
-   AUTH PAGE COMPONENT (FIXED)
+   AUTH PAGE COMPONENT (FIXED UI/UX)
    ==================================== */
 
 const AuthPage = ({ onLogin }) => {
@@ -27,33 +27,29 @@ const AuthPage = ({ onLogin }) => {
                     password
                 });
                 if (error) throw error;
+                // Success! The app.js listener will handle the redirect.
+                // We keep loading true so the UI doesn't flash back to the form.
             } else {
                 // SIGN UP
                 const { data, error } = await window.supabase.auth.signUp({
                     email,
                     password,
                     options: {
-                        // Pass username to Supabase so the SQL trigger can use it
                         data: { username: username || email.split('@')[0] },
-                        // Explicitly tell Supabase to come back here
-                        emailRedirectTo: 'http://localhost:8000'
+                        emailRedirectTo: window.location.origin
                     }
                 });
 
                 if (error) throw error;
 
-                // ✅ SUCCESS! Show message instead of failing silently
                 if (data.user && !data.session) {
                     setSuccessMsg('✅ Confirmation email sent! Please check your inbox.');
-                    setLoading(false);
-                    return;
+                    setLoading(false); // Stop loading so they can read the message
                 }
             }
         } catch (err) {
             setError(err.message);
-        } finally {
-            // Only stop loading if we didn't get the success message
-            if (!successMsg) setLoading(false);
+            setLoading(false);
         }
     };
 
@@ -73,12 +69,12 @@ const AuthPage = ({ onLogin }) => {
                     </div>
                 )}
 
-                {/* SUCCESS MESSAGE */}
+                {/* SUCCESS MESSAGE (Fixed: No Bounce, Better Spacing) */}
                 {successMsg ? (
-                    <div className="bg-green-500/20 border border-green-500 text-green-200 p-6 rounded-xl mb-6 text-center animate-bounce">
+                    <div className="bg-green-500/20 border border-green-500 text-green-200 p-6 rounded-xl mb-6 text-center fade-in">
                         <div className="text-4xl mb-2">📩</div>
                         <div className="font-bold text-lg">Check your Email</div>
-                        <div className="text-sm mt-2 opacity-80">{successMsg}</div>
+                        <div className="text-sm mt-2 opacity-80 leading-relaxed">{successMsg}</div>
                         <div className="text-xs mt-4 text-gray-400">
                             (Don't see it? Check spam. Click the link to finish!)
                         </div>

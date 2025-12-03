@@ -1,13 +1,10 @@
 /* ====================================
-   RIVALRY AI - MAIN APP (FINAL)
+   RIVALRY AI - MAIN APP (FINAL SCROLL FIX)
    ==================================== */
 
 const { useState, useEffect, useRef, useMemo } = React;
 
 const RivalryAI = () => {
-    // ====================================
-    // STATE MANAGEMENT
-    // ====================================
     const [session, setSession] = useState(null);
     const [currentUser, setCurrentUser] = useState(null);
 
@@ -17,9 +14,9 @@ const RivalryAI = () => {
     const [userVotes, setUserVotes] = useState({});
     const [userLikes, setUserLikes] = useState({});
 
-    // FEED FILTERS (Merged from Trending)
-    const [feedFilter, setFeedFilter] = useState('all'); // 'all', 'nba', 'nfl'
-    const [feedSort, setFeedSort] = useState('new');     // 'new', 'hot', 'votes'
+    // Feed State
+    const [feedFilter, setFeedFilter] = useState('all');
+    const [feedSort, setFeedSort] = useState('new');
 
     // Create Page State
     const [selectedPlayer1, setSelectedPlayer1] = useState(null);
@@ -29,14 +26,17 @@ const RivalryAI = () => {
 
     const feedRef = useRef(null);
 
-    // ====================================
-    // INITIALIZATION
-    // ====================================
+    // ✅ FIXED: Auto-scroll to top when filters or view changes
+    useEffect(() => {
+        if (feedRef.current) {
+            feedRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    }, [feedFilter, feedSort, currentView]);
+
+    // Initialization
     useEffect(() => {
         const initApp = async () => {
             console.log('🚀 Rivalry AI starting...');
-
-            // 1. Auth Check
             const { data: { session } } = await window.supabase.auth.getSession();
             setSession(session);
 
@@ -46,7 +46,6 @@ const RivalryAI = () => {
                 await loadUserLikes(session.user.id);
             }
 
-            // 2. Auth Listener
             const { data: { subscription } } = window.supabase.auth.onAuthStateChange((_event, session) => {
                 setSession(session);
                 if (session) {
@@ -60,27 +59,19 @@ const RivalryAI = () => {
                 }
             });
 
-            // 3. Load Data (REAL DB DATA)
             await window.loadRealPlayers();
-            await loadRealMatchups(); // Loads Feed or Shared Link
-
+            await loadRealMatchups();
             setLoading(false);
-
             return () => subscription.unsubscribe();
         };
-
         initApp();
     }, []);
 
-    // Load User Profile
     const loadUserProfile = async (userId) => {
         const { data } = await window.supabase.from('profiles').select('*').eq('id', userId).single();
-        if (data) {
-            setCurrentUser({ ...data, avatar: data.avatar_url || '👤', level: data.level || 1 });
-        }
+        if (data) setCurrentUser({ ...data, avatar: data.avatar_url || '👤', level: data.level || 1 });
     };
 
-    // Load User's Past Votes
     const loadUserVotes = async (userId) => {
         const { data } = await window.supabase.from('votes').select('matchup_id, choice').eq('user_id', userId);
         if (data) {
@@ -90,7 +81,6 @@ const RivalryAI = () => {
         }
     };
 
-    // Load User's Past Likes
     const loadUserLikes = async (userId) => {
         const { data } = await window.supabase.from('likes').select('matchup_id').eq('user_id', userId);
         if (data) {
@@ -100,36 +90,27 @@ const RivalryAI = () => {
         }
     };
 
-    // ✅ LOAD MATCHUPS (HANDLES SHARED LINKS)
     const loadRealMatchups = async () => {
         try {
-            // 1. Check if we are visiting a shared link
             const params = new URLSearchParams(window.location.search);
             const sharedId = params.get('matchup');
-
             let query = window.supabase.from('matchups').select('*');
 
-            // 2. Filter Logic
             if (sharedId) {
                 console.log("🔗 Shared Link Detected!", sharedId);
-                query = query.eq('id', sharedId); // Load ONLY the shared one
+                query = query.eq('id', sharedId);
             } else {
-                // Normal Feed: Load newest 100
                 query = query.order('created_at', { ascending: false }).limit(100);
             }
 
             const { data: dbMatchups, error } = await query;
-
             if (error) throw error;
 
-            // 3. Enrich with Player Data
             if (dbMatchups && window.allPlayers) {
                 const enrichedMatchups = dbMatchups.map(m => {
                     const p1 = window.allPlayers.find(p => p.id === m.player1_id);
                     const p2 = window.allPlayers.find(p => p.id === m.player2_id);
-
                     if (!p1 || !p2) return null;
-
                     return {
                         ...m,
                         player1: p1,
@@ -140,7 +121,6 @@ const RivalryAI = () => {
                         shares: m.shares || 0
                     };
                 }).filter(Boolean);
-
                 setMatchups(enrichedMatchups);
             }
         } catch (err) {
@@ -148,31 +128,19 @@ const RivalryAI = () => {
         }
     };
 
-    // ====================================
-    // FILTER & SORT LOGIC (THE BUG FIX)
-    // ====================================
     const processedMatchups = useMemo(() => {
         let result = [...matchups];
-
-        // 1. Filter by Sport
         if (feedFilter !== 'all') {
             result = result.filter(m => m.sport === feedFilter.toUpperCase());
         }
-
-        // 2. Sort
         result.sort((a, b) => {
             if (feedSort === 'hot') return b.likes - a.likes;
             if (feedSort === 'votes') return (b.votes.player1 + b.votes.player2) - (a.votes.player1 + a.votes.player2);
-            // Default 'new'
             return new Date(b.created_at || b.createdAt) - new Date(a.created_at || a.createdAt);
         });
-
         return result;
     }, [matchups, feedFilter, feedSort]);
 
-    // ====================================
-    // RENDER
-    // ====================================
     if (loading) {
         return (
             <div className="w-full h-screen flex items-center justify-center bg-black">
@@ -208,68 +176,40 @@ const RivalryAI = () => {
             {/* Main Content */}
             {currentView === 'feed' && (
                 <>
-                    {/* Floating Filter Bar (Fixed under Top Bar) */}
                     {!window.location.search.includes('matchup=') && (
                         <div className="fixed top-20 left-0 right-0 z-40 px-4 flex flex-col gap-3 pointer-events-none">
                             <div className="flex justify-between items-center w-full max-w-md mx-auto pointer-events-auto">
                                 {/* Sport Filter */}
                                 <div className="flex bg-black/50 backdrop-blur-md rounded-full p-1 border border-white/10">
                                     {['all', 'nba', 'nfl'].map(f => (
-                                        <button
-                                            key={f}
-                                            onClick={() => setFeedFilter(f)}
-                                            className={`px-4 py-1.5 rounded-full text-xs font-bold smooth ${feedFilter === f ? 'bg-white text-black' : 'text-gray-400 hover:text-white'
-                                                }`}
-                                        >
-                                            {f === 'all' ? 'All' : f.toUpperCase()}
-                                        </button>
+                                        <button key={f} onClick={() => setFeedFilter(f)} className={`px-4 py-1.5 rounded-full text-xs font-bold smooth ${feedFilter === f ? 'bg-white text-black' : 'text-gray-400 hover:text-white'}`}>{f === 'all' ? 'All' : f.toUpperCase()}</button>
                                     ))}
                                 </div>
-
                                 {/* Sort Filter */}
                                 <div className="flex bg-black/50 backdrop-blur-md rounded-full p-1 border border-white/10">
-                                    {[
-                                        { id: 'new', label: 'New' },
-                                        { id: 'hot', label: 'Hot 🔥' },
-                                        { id: 'votes', label: 'Top 🗳️' }
-                                    ].map(s => (
-                                        <button
-                                            key={s.id}
-                                            onClick={() => setFeedSort(s.id)}
-                                            className={`px-3 py-1.5 rounded-full text-xs font-bold smooth ${feedSort === s.id ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'
-                                                }`}
-                                        >
-                                            {s.label}
-                                        </button>
+                                    {[{ id: 'new', label: 'New' }, { id: 'hot', label: 'Hot 🔥' }, { id: 'votes', label: 'Top 🗳️' }].map(s => (
+                                        <button key={s.id} onClick={() => setFeedSort(s.id)} className={`px-3 py-1.5 rounded-full text-xs font-bold smooth ${feedSort === s.id ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'}`}>{s.label}</button>
                                     ))}
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {/* Feed Container */}
                     <div ref={feedRef} className="snap-container hide-scrollbar pt-32 pb-24 relative">
-
-                        {/* Back Button (Shared Link) */}
+                        {/* Back Button */}
                         {window.location.search.includes('matchup=') && (
                             <div className="fixed top-28 left-0 right-0 z-[60] flex justify-center fade-in pointer-events-none">
                                 <button
                                     onClick={() => {
-                                        // Check if we came from profile
                                         const params = new URLSearchParams(window.location.search);
                                         const isFromProfile = params.get('from') === 'profile';
-
-                                        window.history.pushState({}, '', '/'); // Clear URL
-
-                                        if (isFromProfile) {
-                                            setCurrentView('profile');
-                                        } else {
-                                            window.location.reload();
-                                        }
+                                        window.history.pushState({}, '', '/');
+                                        if (isFromProfile) setCurrentView('profile');
+                                        else window.location.reload();
                                     }}
                                     className="pointer-events-auto bg-purple-600 text-white px-6 py-2 rounded-full font-bold shadow-lg hover:scale-105 smooth flex items-center gap-2 border border-purple-400/50"
                                 >
-                                    {new URLSearchParams(window.location.search).get('from') === 'profile' ? '⬅️ Back to Profile' : '⬅️ Back to Full Feed'}
+                                    {new URLSearchParams(window.location.search).get('from') === 'profile' ? 'Back to Profile' : 'Back to Full Feed'}
                                 </button>
                             </div>
                         )}
@@ -280,7 +220,6 @@ const RivalryAI = () => {
                                 <button onClick={() => setCurrentView('create')} className="text-purple-400 font-bold mt-2">Create One!</button>
                             </div>
                         ) : (
-                            // ✅ FIXED: USING PROCESSED (FILTERED) MATCHUPS
                             processedMatchups.map((matchup) => (
                                 <MatchupCard
                                     key={matchup.id}
@@ -314,19 +253,8 @@ const RivalryAI = () => {
                 />
             )}
 
-            {/* ✅ NEW: Players Page */}
-            {currentView === 'players' && (
-                <PlayersPage allPlayers={window.allPlayers} />
-            )}
-
-            {currentView === 'profile' && (
-                <ProfilePage
-                    currentUser={currentUser}
-                    userVotes={userVotes}
-                    matchups={matchups}
-                />
-            )}
-
+            {currentView === 'players' && <PlayersPage allPlayers={window.allPlayers} />}
+            {currentView === 'profile' && <ProfilePage currentUser={currentUser} userVotes={userVotes} matchups={matchups} />}
             <BottomNav currentView={currentView} setCurrentView={setCurrentView} />
         </div>
     );
