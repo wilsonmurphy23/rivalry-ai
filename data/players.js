@@ -1,5 +1,5 @@
 /* ====================================
-   PLAYERS DATA - MASTER VOR CALCULATOR (FIXED POSITIONS)
+   PLAYERS DATA - DYNAMIC BELL CURVE (TRUE DISTRIBUTION) - UPGRADED
    ==================================== */
 
 const SUPABASE_URL = 'https://qnplrybkdcwngzofufcw.supabase.co';
@@ -8,11 +8,11 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 window.allPlayers = [];
 window.playersLoaded = false;
 
-// 1. Load ALL players (Pagination Handling)
 window.loadRealPlayers = async () => {
     try {
-        console.log('🔄 Loading complete player database...');
+        console.log('Loading complete player database...');
 
+        // 1. FETCH ALL DATA
         let allData = [];
         let from = 0;
         const step = 1000;
@@ -35,20 +35,64 @@ window.loadRealPlayers = async () => {
             }
         }
 
-        console.log(`✅ Loaded ${allData.length} total players.`);
+        console.log(`✅ Loaded ${allData.length} players. Running Statistical Analysis...`);
 
-        // 2. Process & Score Players
-        window.allPlayers = allData.map(p => {
+        // 2. CALCULATE RAW SCORES (PASS 1)
+        const playersWithRawScores = allData.map(p => {
             const stats = p.stats || {};
-            // Fallback emoji if image missing
-            let image = p.image;
-            if (!image || image === 'undefined') image = p.sport === 'NBA' ? '🏀' : '🏈';
-
+            const posGroup = getPositionGroup(p.sport, p.position);
             return {
                 ...p,
                 stats: stats,
-                eraAdjustedVOR: calculateVOR(stats, p.sport, p.position),
-                image: image
+                rawScore: calculateRawScore(stats, p.sport, p.position), // Get unscaled points
+                posGroup: posGroup,
+                image: p.image && p.image !== 'undefined' ? p.image : (p.sport === 'NBA' ? '🏀' : '🏈')
+            };
+        });
+
+        // 3. ANALYZE DISTRIBUTIONS (PASS 2)
+        // Calculate Mean and Standard Deviation for every position group
+        const distributions = {};
+        const groups = [...new Set(playersWithRawScores.map(p => p.posGroup))];
+
+        groups.forEach(group => {
+            // Filter out players with 0 stats so they don't drag the average down too much
+            const groupScores = playersWithRawScores
+                .filter(p => p.posGroup === group && p.rawScore > 1)
+                .map(p => p.rawScore);
+
+            if (groupScores.length > 0) {
+                const mean = groupScores.reduce((a, b) => a + b, 0) / groupScores.length;
+                const variance = groupScores.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / groupScores.length;
+                distributions[group] = {
+                    mean: mean,
+                    stdDev: Math.sqrt(variance)
+                };
+            } else {
+                distributions[group] = { mean: 10, stdDev: 1 }; // Fallback
+            }
+        });
+
+        // 4. ASSIGN Z-SCORES (PASS 3)
+        window.allPlayers = playersWithRawScores.map(p => {
+            const dist = distributions[p.posGroup];
+
+            // Z-Score = (Your Score - Average) / Variance
+            const zScore = (p.rawScore - dist.mean) / (dist.stdDev || 1);
+
+            // --- THE CURVE LOGIC ---
+            // Each Standard Deviation = +/- 10 points (75 is average)
+            let finalRating = 75 + (zScore * 10);
+
+            // Cap at 99, but lower floor to 40
+            finalRating = Math.min(99, Math.max(40, Math.round(finalRating)));
+
+            // Hard override for players with literally 0 stats
+            if (p.rawScore <= 0.1) finalRating = 40;
+
+            return {
+                ...p,
+                eraAdjustedVOR: finalRating
             };
         });
 
@@ -56,21 +100,32 @@ window.loadRealPlayers = async () => {
         return window.allPlayers;
 
     } catch (error) {
-        console.error('❌ Error loading players:', error);
+        console.error('Error loading players:', error);
         return [];
     }
 };
 
-// =================================================================
-// 🧠 THE MASTER VOR FORMULA (Matches Database Strings)
-// =================================================================
-const calculateVOR = (s, sport, position) => {
-    if (!s) return 60;
+// Helper: Grouping (Handles Full Names)
+const getPositionGroup = (sport, position) => {
+    if (sport === 'NBA') return 'NBA';
 
+    const pos = position ? position.toUpperCase() : 'UNKNOWN';
+    if (pos.includes('QUARTERBACK') || pos === 'QB') return 'NFL_QB';
+    if (['RB', 'FB', 'HB'].some(r => pos.includes(r))) return 'NFL_RB';
+    if (['WR', 'TE', 'SE', 'FL'].some(r => pos.includes(r))) return 'NFL_WR';
+    if (pos.includes('KICKER') || pos === 'K') return 'NFL_K';
+    if (pos.includes('PUNTER') || pos === 'P') return 'NFL_P';
+    if (['DE', 'DT', 'NT', 'DL', 'LB', 'ILB', 'OLB', 'MLB', 'CB', 'S', 'FS', 'SS', 'DB'].some(r => pos.includes(r))) return 'NFL_DEF';
+    return 'NFL_OTHER';
+};
+
+// Helper: Calculate RAW production (Uncapped, Unscaled)
+const calculateRawScore = (s, sport, position) => {
+    if (!s) return 0;
     let rawScore = 0;
     const pos = position ? position.toUpperCase() : 'UNKNOWN';
 
-    // --- 🏀 NBA (PER-Lite Formula) ---
+    // --- 🏀 NBA (PER-Lite with Efficiency) ---
     if (sport === 'NBA') {
         const ppg = parseFloat(s.ppg) || 0;
         const apg = parseFloat(s.apg) || 0;
@@ -86,53 +141,46 @@ const calculateVOR = (s, sport, position) => {
         const fg3Pct = parseFloat(s.fg3Pct) || 0;
         const ftPct = parseFloat(s.ftPct) || 0;
 
-        // Base Score
+        // Base Score (Restored original calculation with OREB/DREB split)
         rawScore = (ppg * 1.0)
-            + (oreb * 1.2) // Offensive boards are valuable
+            + (oreb * 1.2)
             + (dreb * 0.8)
             + (apg * 0.9)
             + (stl * 2.0)
             + (blk * 2.0)
             - (tov * 1.0);
 
-        // Efficiency Multiplier (Reward 50/40/90 players)
+        // --- RESTORED EFFICIENCY BONUS ---
         if (fgPct > 50) rawScore += 2;
         if (fg3Pct > 40) rawScore += 2;
         if (ftPct > 90) rawScore += 2;
-
-        // Normalize (NBA PER usually ~15-30. We want 60-99 scale)
-        // Avg player ~15 rawScore -> 75 rating
-        return normalizeScore(rawScore, 2, 40);
     }
 
-    // --- 🏈 NFL (Position Specific - Now with Full Names) ---
+    // --- 🏈 NFL (Position Specific with Penalties/Bonuses) ---
     else {
         // Common Negative Stats
-        const fumbles = (parseFloat(s.rushingFumbles) || 0) + (parseFloat(s.receivingFumbles) || 0) + (parseFloat(s.fumblesRecovered) || 0 * -1);
+        const fumbles = (parseFloat(s.rushingFumbles) || 0) + (parseFloat(s.receivingFumbles) || 0);
 
         // 1. QUARTERBACKS
-        if (pos === 'QB' || pos === 'QUARTERBACK') {
+        if (pos.includes('QUARTERBACK') || pos === 'QB') {
             const passYds = parseFloat(s.passingYards) || 0;
             const passTDs = parseFloat(s.passingTouchdowns) || 0;
             const ints = parseFloat(s.passingInts) || 0;
-            const sacksTaken = parseFloat(s.passingSacks) || 0;
+            const sacksTaken = parseFloat(s.passingSacks) || 0; // RESTORED Sacks Taken
             const rushYds = parseFloat(s.rushingYards) || 0;
             const rushTDs = parseFloat(s.rushingTouchdowns) || 0;
 
             rawScore = (passYds / 25)
                 + (passTDs * 4)
                 - (ints * 2)
-                - (sacksTaken * 0.5)
+                - (sacksTaken * 0.5) // RESTORED Sacks Taken Penalty
                 + (rushYds / 10)
                 + (rushTDs * 6)
                 - (fumbles * 2);
-
-            // Normalize (Elite QB ~400 pts, Avg ~150)
-            return normalizeScore(rawScore, 100, 450);
         }
 
         // 2. RUNNING BACKS
-        else if (['RB', 'FB', 'HB', 'RUNNING BACK', 'FULLBACK'].includes(pos)) {
+        else if (['RB', 'FB', 'HB', 'RUNNING BACK'].some(r => pos.includes(r))) {
             const rushYds = parseFloat(s.rushingYards) || 0;
             const rushTDs = parseFloat(s.rushingTouchdowns) || 0;
             const recYds = parseFloat(s.receivingYards) || 0;
@@ -143,128 +191,84 @@ const calculateVOR = (s, sport, position) => {
                 + (rushTDs * 6)
                 + (recYds / 10)
                 + (recTDs * 6)
-                + (rec * 0.5) // 0.5 PPR
+                + (rec * 0.5) // 0.5 PPR (Restored explicit half-PPR)
                 - (fumbles * 2);
-
-            // Normalize (Elite RB ~300 pts, Avg ~100)
-            return normalizeScore(rawScore, 50, 350);
         }
 
         // 3. WIDE RECEIVERS / TIGHT ENDS
-        else if (['WR', 'TE', 'SE', 'FL', 'WIDE RECEIVER', 'TIGHT END'].includes(pos)) {
+        else if (['WR', 'TE', 'SE', 'FL', 'WIDE RECEIVER'].some(r => pos.includes(r))) {
             const recYds = parseFloat(s.receivingYards) || 0;
             const recTDs = parseFloat(s.receivingTouchdowns) || 0;
             const rec = parseFloat(s.receptions) || 0;
             const targets = parseFloat(s.receivingTargets) || 0;
 
-            // Catch Rate Bonus
+            // --- RESTORED CATCH RATE BONUS ---
             const catchRate = targets > 0 ? (rec / targets) : 0;
             const efficiencyBonus = catchRate > 0.70 ? 10 : 0;
 
             rawScore = (recYds / 10)
                 + (recTDs * 6)
-                + (rec * 1.0) // 1.0 PPR
-                + efficiencyBonus
+                + (rec * 1.0) // 1.0 PPR (Restored explicit full-PPR)
+                + efficiencyBonus // RESTORED
                 - (fumbles * 2);
-
-            // Normalize (Elite WR ~350 pts, Avg ~120)
-            return normalizeScore(rawScore, 60, 400);
         }
 
-        // 4. DEFENSIVE FRONT (DL / LB)
-        else if (['DE', 'DT', 'NT', 'DL', 'LB', 'ILB', 'OLB', 'MLB',
-            'DEFENSIVE END', 'DEFENSIVE TACKLE', 'LINEBACKER'].includes(pos)) {
-
+        // 4. DEFENSE / DEFENSIVE FRONT / SECONDARY
+        else if (['DE', 'DT', 'NT', 'DL', 'LB', 'ILB', 'OLB', 'MLB', 'CB', 'S', 'FS', 'SS', 'DB', 'DEFENSIVE', 'CORNERBACK', 'SAFETY'].some(r => pos.includes(r))) {
+            // The old DEF/DB split logic is removed here to match the cleaner posGroup logic,
+            // using the combined scoring from the detailed DEFENSIVE FRONT section (as it was more comprehensive)
             const tackles = parseFloat(s.tackles) || 0;
             const sacks = parseFloat(s.sacks) || 0;
+            const ints = parseFloat(s.defInterceptions) || 0;
+            const pds = parseFloat(s.passesDefended) || 0;
             const tfl = parseFloat(s.tfl) || 0;
-            const hits = parseFloat(s.qbHits) || 0;
             const ff = parseFloat(s.fumblesForced) || 0;
             const fr = parseFloat(s.fumblesRecovered) || 0;
-            const ints = parseFloat(s.defInterceptions) || 0;
-            const defTDs = parseFloat(s.fumblesTouchdowns) || 0 + parseFloat(s.intTouchdowns) || 0;
+            const defTDs = (parseFloat(s.fumblesTouchdowns) || 0) + (parseFloat(s.intTouchdowns) || 0);
 
             rawScore = (tackles * 1.5)
                 + (sacks * 4)
-                + (tfl * 2)
-                + (hits * 1)
-                + (ff * 3)
-                + (fr * 3)
                 + (ints * 5)
-                + (defTDs * 6);
-
-            // Normalize (Elite Defender ~150-200 pts, Avg ~50)
-            return normalizeScore(rawScore, 30, 200);
+                + (pds * 2) // Re-added PDs from old DB logic
+                + (tfl * 2) // Re-added TFL from old DEF logic
+                + (ff * 3) // Re-added FF from old DEF logic
+                + (fr * 3) // Re-added FR from old DEF logic
+                + (defTDs * 6); // Re-added TDs from old DEF logic
         }
 
-        // 5. SECONDARY (CB / S)
-        else if (['CB', 'S', 'FS', 'SS', 'DB', 'CORNERBACK', 'SAFETY'].includes(pos)) {
-            const tackles = parseFloat(s.tackles) || 0;
-            const ints = parseFloat(s.defInterceptions) || 0;
-            const pds = parseFloat(s.passesDefended) || 0;
-            const defTDs = parseFloat(s.intTouchdowns) || 0;
-
-            rawScore = (tackles * 1.0)
-                + (ints * 6) // INTs worth more for DBs
-                + (pds * 3)  // PDs are their main job
-                + (defTDs * 6);
-
-            // Normalize (Elite DB ~100-150 pts, Avg ~40)
-            return normalizeScore(rawScore, 20, 150);
-        }
-
-        // 6. KICKERS
-        else if (['K', 'KICKER', 'PLACE KICKER', 'PLACEKICKER'].includes(pos)) {
+        // 5. KICKERS
+        else if (pos.includes('KICKER') || pos === 'K') {
             const fgs = parseFloat(s.fieldGoalsMade) || 0;
             const att = parseFloat(s.fieldGoalsAtt) || 0;
             const long = parseFloat(s.longFieldGoal) || 0;
-            const xps = parseFloat(s.extraPointsMade) || 0;
-
-            const misses = att - fgs;
+            const misses = att - fgs; // Calculated Misses
 
             rawScore = (fgs * 3)
-                + (xps * 1)
-                - (misses * 1)
-                + (long > 50 ? 5 : 0); // Bonus for big leg
-
-            // Normalize (Elite K ~150 pts, Avg ~80)
-            return normalizeScore(rawScore, 50, 160);
+                + (parseFloat(s.extraPointsMade) || 0) * 1 // Restored XP points
+                - (misses * 1) // RESTORED Miss Penalty
+                + (long > 50 ? 5 : 0); // Restored Long FG Bonus
         }
 
-        // 7. PUNTERS
-        else if (['P', 'PUNTER'].includes(pos)) {
+        // 6. PUNTERS
+        else if (pos.includes('PUNTER') || pos === 'P') {
             const punts = parseFloat(s.punts) || 0;
             const avg = parseFloat(s.puntAvg) || 0;
             const in20 = parseFloat(s.puntsInside20) || 0;
             const long = parseFloat(s.longPunt) || 0;
 
-            // Rating based on quality, not just volume
-            rawScore = (punts * 1) + (avg * 2) + (in20 * 3) + (long > 60 ? 5 : 0);
-
-            // Normalize (Elite P ~200 pts)
-            return normalizeScore(rawScore, 80, 250);
+            rawScore = (punts * 1) // Restored volume component
+                + (avg * 2) // Increased weight on average
+                + (in20 * 3) // Increased weight on inside 20
+                + (long > 60 ? 5 : 0); // Restored Long Punt Bonus
         }
 
-        // 8. O-LINE / UNKNOWN
+        // 7. O-LINE / UNKNOWN
         else {
-            const games = parseFloat(s.gamesPlayed) || 0;
-            // Base score just for being active
-            return Math.min(90, 60 + games);
+            rawScore = (parseFloat(s.gamesPlayed) || 0) * 1.5;
         }
     }
 
-    // Fallback
-    return 60;
+    return rawScore;
 };
 
-// Helper to map a raw stat score (e.g., 300 fantasy points) to a 60-99 rating
-const normalizeScore = (val, minRange, maxRange) => {
-    if (val <= minRange) return 60; // Benchwarmer floor
-    if (val >= maxRange) return 99; // MVP ceiling
-
-    // Linear interpolation between 60 and 99
-    const percent = (val - minRange) / (maxRange - minRange);
-    return Math.round(60 + (percent * 39));
-};
-
-console.log('✅ Players data module loaded (Completionist VOR)');
+console.log('Players data module loaded (True Bell Curve - FULL)');

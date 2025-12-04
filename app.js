@@ -1,5 +1,5 @@
 /* ====================================
-   RIVALRY AI - MAIN APP (FINAL SCROLL FIX)
+   RIVALRY AI - MAIN APP (ARROWS FIX)
    ==================================== */
 
 const { useState, useEffect, useRef, useMemo } = React;
@@ -26,12 +26,29 @@ const RivalryAI = () => {
 
     const feedRef = useRef(null);
 
-    // ✅ FIXED: Auto-scroll to top when filters or view changes
+    // Auto-scroll to top when filters or view changes
     useEffect(() => {
         if (feedRef.current) {
             feedRef.current.scrollTo({ top: 0, behavior: 'smooth' });
         }
     }, [feedFilter, feedSort, currentView]);
+
+    // Keyboard Navigation
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (currentView !== 'feed') return;
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                scrollFeed('next');
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                scrollFeed('prev');
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [currentView]);
 
     // Initialization
     useEffect(() => {
@@ -141,6 +158,15 @@ const RivalryAI = () => {
         return result;
     }, [matchups, feedFilter, feedSort]);
 
+    const scrollFeed = (direction) => {
+        if (!feedRef.current) return;
+        const scrollAmount = window.innerHeight;
+        feedRef.current.scrollBy({
+            top: direction === 'next' ? scrollAmount : -scrollAmount,
+            behavior: 'smooth'
+        });
+    };
+
     if (loading) {
         return (
             <div className="w-full h-screen flex items-center justify-center bg-black">
@@ -157,7 +183,7 @@ const RivalryAI = () => {
         <div className="min-h-screen bg-black">
             {/* Top Bar */}
             <div className="fixed top-0 left-0 right-0 glass-strong z-50 border-b border-white/10 bg-black/80 backdrop-blur-md">
-                <div className="flex items-center justify-between px-6 py-4">
+                <div className="flex items-center justify-between px-6 py-4 max-w-7xl mx-auto w-full">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl flex items-center justify-center shadow-lg glow-purple">
                             <Icon name="trophy" size={20} className="text-white" />
@@ -177,26 +203,53 @@ const RivalryAI = () => {
             {currentView === 'feed' && (
                 <>
                     {!window.location.search.includes('matchup=') && (
-                        <div className="fixed top-20 left-0 right-0 z-40 px-4 flex flex-col gap-3 pointer-events-none">
-                            <div className="flex justify-between items-center w-full max-w-md mx-auto pointer-events-auto">
+                        <div className="fixed top-24 left-0 right-0 z-40 px-4 flex flex-col gap-3 pointer-events-none">
+                            <div className="flex justify-between items-center w-full max-w-6xl mx-auto pointer-events-auto md:gap-12">
+
                                 {/* Sport Filter */}
-                                <div className="flex bg-black/50 backdrop-blur-md rounded-full p-1 border border-white/10">
+                                <div className="flex bg-black/60 backdrop-blur-md rounded-full p-1.5 border border-white/10 shadow-2xl">
                                     {['all', 'nba', 'nfl'].map(f => (
-                                        <button key={f} onClick={() => setFeedFilter(f)} className={`px-4 py-1.5 rounded-full text-xs font-bold smooth ${feedFilter === f ? 'bg-white text-black' : 'text-gray-400 hover:text-white'}`}>{f === 'all' ? 'All' : f.toUpperCase()}</button>
+                                        <button
+                                            key={f}
+                                            onClick={() => setFeedFilter(f)}
+                                            className={`
+                                                px-4 py-1.5 text-xs font-bold uppercase tracking-wide smooth rounded-full
+                                                md:px-8 md:py-3 md:text-lg md:font-black
+                                                ${feedFilter === f
+                                                    ? 'bg-white text-black shadow-lg scale-105'
+                                                    : 'text-gray-400 hover:text-white hover:bg-white/10'
+                                                }
+                                            `}
+                                        >
+                                            {f === 'all' ? 'All Sports' : f}
+                                        </button>
                                     ))}
                                 </div>
+
                                 {/* Sort Filter */}
-                                <div className="flex bg-black/50 backdrop-blur-md rounded-full p-1 border border-white/10">
+                                <div className="flex bg-black/60 backdrop-blur-md rounded-full p-1.5 border border-white/10 shadow-2xl">
                                     {[{ id: 'new', label: 'New' }, { id: 'hot', label: 'Hot 🔥' }, { id: 'votes', label: 'Top 🗳️' }].map(s => (
-                                        <button key={s.id} onClick={() => setFeedSort(s.id)} className={`px-3 py-1.5 rounded-full text-xs font-bold smooth ${feedSort === s.id ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'}`}>{s.label}</button>
+                                        <button
+                                            key={s.id}
+                                            onClick={() => setFeedSort(s.id)}
+                                            className={`
+                                                px-4 py-1.5 text-xs font-bold smooth rounded-full
+                                                md:px-8 md:py-3 md:text-lg md:font-black
+                                                ${feedSort === s.id
+                                                    ? 'bg-purple-600 text-white shadow-lg scale-105'
+                                                    : 'text-gray-400 hover:text-white hover:bg-white/10'
+                                                }
+                                            `}
+                                        >
+                                            {s.label}
+                                        </button>
                                     ))}
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    <div ref={feedRef} className="snap-container hide-scrollbar pt-32 pb-24 relative">
-                        {/* Back Button */}
+                    <div ref={feedRef} className="snap-container hide-scrollbar pt-0 pb-0 relative">
                         {window.location.search.includes('matchup=') && (
                             <div className="fixed top-28 left-0 right-0 z-[60] flex justify-center fade-in pointer-events-none">
                                 <button
@@ -234,6 +287,25 @@ const RivalryAI = () => {
                             ))
                         )}
                     </div>
+
+                    {/* ✅ FIXED: Arrows hidden if looking at a specific matchup */}
+                    {!window.location.search.includes('matchup=') && (
+                        <div className="fixed right-8 top-1/2 -translate-y-1/2 z-50 hidden md:flex flex-col gap-4">
+                            <button
+                                onClick={() => scrollFeed('prev')}
+                                className="w-12 h-12 rounded-full glass-strong flex items-center justify-center hover:bg-white/10 smooth hover:scale-110 group border border-white/20"
+                            >
+                                <Icon name="chevronDown" className="rotate-180 text-gray-400 group-hover:text-white" size={24} />
+                            </button>
+
+                            <button
+                                onClick={() => scrollFeed('next')}
+                                className="w-14 h-14 rounded-full bg-purple-600 flex items-center justify-center hover:bg-purple-500 smooth hover:scale-110 shadow-lg shadow-purple-500/30 group"
+                            >
+                                <Icon name="chevronDown" className="text-white group-hover:translate-y-0.5 smooth" size={28} />
+                            </button>
+                        </div>
+                    )}
                 </>
             )}
 
