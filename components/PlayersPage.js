@@ -1,5 +1,5 @@
 /* ====================================
-   PLAYERS PAGE (FIXED: CLOSE BUTTON Z-INDEX)
+   PLAYERS PAGE (FIXED FILTERS & NORMALIZED POSITIONS)
    ==================================== */
 
 const PlayersPage = ({ allPlayers }) => {
@@ -22,7 +22,14 @@ const PlayersPage = ({ allPlayers }) => {
 
         sportPlayers.forEach(p => {
             if (p.teams && p.teams[0]) teams.add(p.teams[0]);
-            if (p.position) positions.add(p.position);
+
+            // ✅ FIX: Normalize positions to Title Case to merge duplicates
+            // e.g. "Place Kicker" and "Place kicker" both become "Place Kicker"
+            if (p.position) {
+                // simple normalization: uppercase first letter of each word
+                const normalized = p.position.toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+                positions.add(normalized);
+            }
         });
 
         return {
@@ -38,7 +45,16 @@ const PlayersPage = ({ allPlayers }) => {
             const q = search.toLowerCase();
             result = result.filter(p => p.name.toLowerCase().includes(q));
         }
-        if (positionFilter !== 'all') result = result.filter(p => p.position === positionFilter);
+
+        // ✅ FIX: Match against normalized position
+        if (positionFilter !== 'all') {
+            result = result.filter(p => {
+                if (!p.position) return false;
+                const normalized = p.position.toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+                return normalized === positionFilter;
+            });
+        }
+
         return result.sort((a, b) => {
             if (sortBy === 'vor') return b.eraAdjustedVOR - a.eraAdjustedVOR;
             if (sortBy === 'name') return a.name.localeCompare(b.name);
@@ -93,6 +109,8 @@ const PlayersPage = ({ allPlayers }) => {
                             <option value="vor" className="text-black">Sort: Highest VOR</option>
                             <option value="name" className="text-black">Sort: Name</option>
                         </select>
+
+                        {/* POSITION FILTER */}
                         <select value={positionFilter} onChange={(e) => setPositionFilter(e.target.value)} className="glass rounded-xl px-4 py-3 text-white text-sm outline-none cursor-pointer hover:bg-white/5">
                             <option value="all" className="text-black">All Positions</option>
                             {uniquePositions.map(pos => (<option key={pos} value={pos} className="text-black">{pos}</option>))}
@@ -136,10 +154,7 @@ const PlayersPage = ({ allPlayers }) => {
                         className="glass-strong w-full sm:max-w-lg sm:rounded-3xl rounded-t-3xl p-0 h-[85vh] flex flex-col slide-up overflow-hidden shadow-2xl relative"
                         onClick={e => e.stopPropagation()}
                     >
-                        {/* ✅ FIX APPLIED HERE:
-                           1. Added z-50 to the button.
-                           2. Added bg-black/20 for better visibility.
-                        */}
+                        {/* ✅ FIX APPLIED HERE: Z-Index & Visibility */}
                         <div className="p-6 bg-gradient-to-b from-white/5 to-transparent border-b border-white/10 text-center relative">
                             <button
                                 onClick={() => setSelectedPlayer(null)}

@@ -1,5 +1,5 @@
 /* ====================================
-   PLAYERS DATA - DYNAMIC BELL CURVE (TRUE DISTRIBUTION) - FIXED
+   PLAYERS DATA - DYNAMIC BELL CURVE (TRUE DISTRIBUTION) - COMPREHENSIVE FIX
    ==================================== */
 
 const SUPABASE_URL = 'https://qnplrybkdcwngzofufcw.supabase.co';
@@ -12,7 +12,6 @@ window.loadRealPlayers = async () => {
     try {
         console.log('Loading complete player database...');
 
-        // 1. FETCH ALL DATA
         let allData = [];
         let from = 0;
         const step = 1000;
@@ -44,21 +43,20 @@ window.loadRealPlayers = async () => {
             return {
                 ...p,
                 stats: stats,
-                rawScore: calculateRawScore(stats, p.sport, p.position), // Get unscaled points
+                rawScore: calculateRawScore(stats, p.sport, posGroup),
                 posGroup: posGroup,
                 image: p.image && p.image !== 'undefined' ? p.image : (p.sport === 'NBA' ? '🏀' : '🏈')
             };
         });
 
         // 3. ANALYZE DISTRIBUTIONS (PASS 2)
-        // Calculate Mean and Standard Deviation for every position group
         const distributions = {};
         const groups = [...new Set(playersWithRawScores.map(p => p.posGroup))];
 
         groups.forEach(group => {
-            // Filter out players with 0 stats so they don't drag the average down too much
+            // Filter out players with effectively 0 stats to avoid skewing the average
             const groupScores = playersWithRawScores
-                .filter(p => p.posGroup === group && p.rawScore > 1)
+                .filter(p => p.posGroup === group && p.rawScore > 0.5)
                 .map(p => p.rawScore);
 
             if (groupScores.length > 0) {
@@ -76,18 +74,15 @@ window.loadRealPlayers = async () => {
         // 4. ASSIGN Z-SCORES (PASS 3)
         window.allPlayers = playersWithRawScores.map(p => {
             const dist = distributions[p.posGroup];
-
-            // Z-Score = (Your Score - Average) / Variance
             const zScore = (p.rawScore - dist.mean) / (dist.stdDev || 1);
 
-            // --- THE CURVE LOGIC ---
-            // Each Standard Deviation = +/- 10 points (75 is average)
+            // Standard Curve: 75 is average, +/- 10 per StdDev
             let finalRating = 75 + (zScore * 10);
 
-            // Cap at 99, but lower floor to 40
+            // Hard caps and floors
             finalRating = Math.min(99, Math.max(40, Math.round(finalRating)));
 
-            // Hard override for players with literally 0 stats
+            // If raw score is basically 0, force floor
             if (p.rawScore <= 0.1) finalRating = 40;
 
             return {
@@ -105,172 +100,179 @@ window.loadRealPlayers = async () => {
     }
 };
 
-// Helper: Grouping (Handles Full Names)
+// ✅ UNIVERSAL POSITION GROUPING (Strict & Granular based on DB Report)
 const getPositionGroup = (sport, position) => {
-    if (sport === 'NBA') return 'NBA';
+    if (sport === 'NBA') return 'NBA'; // All NBA players share the same logic
 
-    const pos = position ? position.toUpperCase() : 'UNKNOWN';
-    if (pos.includes('QUARTERBACK') || pos === 'QB') return 'NFL_QB';
+    // Normalize: Uppercase and trimmed
+    const pos = position ? position.toUpperCase().trim() : 'UNKNOWN';
 
-    // ✅ FIXED: Defense Check First to prevent Cornerback matching RB
-    if (['DE', 'DT', 'NT', 'DL', 'LB', 'ILB', 'OLB', 'MLB', 'CB', 'S', 'FS', 'SS', 'DB', 'DEFENSIVE', 'CORNERBACK', 'SAFETY'].some(r => pos.includes(r))) return 'NFL_DEF';
+    // 1. SPECIALISTS (Check First)
+    if (pos === 'LONG SNAPPER' || pos === 'LS') return 'NFL_LS';
+    if (pos === 'FULLBACK' || pos === 'FB') return 'NFL_FB';
+    if (pos === 'PUNTER' || pos === 'P') return 'NFL_P';
+    // ✅ FIXED: Catch all Kicker variations
+    if (pos.includes('KICKER') || pos === 'K' || pos === 'PK' || pos === 'PLACE KICKER') return 'NFL_K';
 
-    if (['RB', 'FB', 'HB'].some(r => pos.includes(r))) return 'NFL_RB';
-    if (['WR', 'TE', 'SE', 'FL'].some(r => pos.includes(r))) return 'NFL_WR';
-    if (pos.includes('KICKER') || pos === 'K') return 'NFL_K';
-    if (pos.includes('PUNTER') || pos === 'P') return 'NFL_P';
+    // 2. OFFENSIVE LINE (Check Second - Zero Stats Group)
+    if (['OFFENSIVE TACKLE', 'TACKLE', 'GUARD', 'CENTER', 'OT', 'OG', 'C', 'OL', 'T', 'G'].includes(pos)) return 'NFL_OL';
+
+    // 3. DEFENSE (Check Third - Priority over "Back")
+    if (['LINEBACKER', 'LB', 'ILB', 'OLB', 'MLB'].includes(pos)) return 'NFL_LB';
+    if (['DEFENSIVE TACKLE', 'DT', 'NT', 'NOSE TACKLE'].includes(pos)) return 'NFL_DT';
+    if (['DEFENSIVE END', 'DE', 'EDGE', 'LEO', 'RUSH'].includes(pos)) return 'NFL_DE';
+    if (['CORNERBACK', 'CB', 'DB', 'CORNER'].includes(pos)) return 'NFL_CB';
+    if (['SAFETY', 'S', 'FS', 'SS', 'FREE SAFETY', 'STRONG SAFETY'].includes(pos)) return 'NFL_S';
+
+    // 4. SKILL POSITIONS (Check Last)
+    if (pos === 'QUARTERBACK' || pos === 'QB') return 'NFL_QB';
+    if (pos === 'RUNNING BACK' || pos === 'RB' || pos === 'HB' || pos === 'HALFBACK') return 'NFL_RB';
+    if (pos === 'WIDE RECEIVER' || pos === 'WR') return 'NFL_WR';
+    if (pos === 'TIGHT END' || pos === 'TE') return 'NFL_TE'; // Scored like WRs but separate group
 
     return 'NFL_OTHER';
 };
 
-// Helper: Calculate RAW production (Uncapped, Unscaled)
-const calculateRawScore = (s, sport, position) => {
+// ✅ UNIVERSAL SCORE CALCULATION
+const calculateRawScore = (s, sport, posGroup) => {
     if (!s) return 0;
     let rawScore = 0;
-    const pos = position ? position.toUpperCase() : 'UNKNOWN';
 
-    // --- 🏀 NBA (PER-Lite with Efficiency) ---
+    // --- 🏀 NBA ---
     if (sport === 'NBA') {
         const ppg = parseFloat(s.ppg) || 0;
         const apg = parseFloat(s.apg) || 0;
-        const rpg = parseFloat(s.rpg) || 0; // Total Reb (fallback)
-        const oreb = parseFloat(s.oreb) || (rpg * 0.3); // Est if missing
-        const dreb = parseFloat(s.dreb) || (rpg * 0.7);
+        const rpg = parseFloat(s.rpg) || 0;
         const stl = parseFloat(s.stl) || 0;
         const blk = parseFloat(s.blk) || 0;
         const tov = parseFloat(s.turnovers) || 0;
-
-        // Efficiency bonuses
         const fgPct = parseFloat(s.fgPct) || 0;
-        const fg3Pct = parseFloat(s.fg3Pct) || 0;
-        const ftPct = parseFloat(s.ftPct) || 0;
 
-        // Base Score (Restored original calculation with OREB/DREB split)
-        rawScore = (ppg * 1.0)
-            + (oreb * 1.2)
-            + (dreb * 0.8)
-            + (apg * 0.9)
-            + (stl * 2.0)
-            + (blk * 2.0)
-            - (tov * 1.0);
-
-        // --- RESTORED EFFICIENCY BONUS ---
+        // NBA Formula: Volume + Efficiency
+        rawScore = (ppg * 1.0) + (rpg * 1.2) + (apg * 1.5) + (stl * 2.0) + (blk * 2.0) - (tov * 1.0);
         if (fgPct > 50) rawScore += 2;
-        if (fg3Pct > 40) rawScore += 2;
-        if (ftPct > 90) rawScore += 2;
     }
 
-    // --- 🏈 NFL (Position Specific with Penalties/Bonuses) ---
+    // --- 🏈 NFL ---
     else {
-        // Common Negative Stats
-        const fumbles = (parseFloat(s.rushingFumbles) || 0) + (parseFloat(s.receivingFumbles) || 0);
+        const games = parseFloat(s.gamesPlayed) || 0;
+        const fumbles = (parseFloat(s.rushingFumbles) || 0) + (parseFloat(s.receivingFumbles) || 0); // Negative stat
 
-        // 1. QUARTERBACKS
-        if (pos.includes('QUARTERBACK') || pos === 'QB') {
-            const passYds = parseFloat(s.passingYards) || 0;
-            const passTDs = parseFloat(s.passingTouchdowns) || 0;
-            const ints = parseFloat(s.passingInts) || 0;
-            const sacksTaken = parseFloat(s.passingSacks) || 0; // RESTORED Sacks Taken
-            const rushYds = parseFloat(s.rushingYards) || 0;
-            const rushTDs = parseFloat(s.rushingTouchdowns) || 0;
+        // GLOBAL BONUS: Return Yards (Applies to ANYONE who returns kicks)
+        const retYds = (parseFloat(s.kickReturnYards) || 0) + (parseFloat(s.puntReturnYards) || 0);
+        const retTDs = (parseFloat(s.kickReturnTouchdowns) || 0) + (parseFloat(s.puntReturnTouchdowns) || 0);
+        const specialTeamsBonus = (retYds / 20) + (retTDs * 6);
 
-            rawScore = (passYds / 25)
-                + (passTDs * 4)
-                - (ints * 2)
-                - (sacksTaken * 0.5) // RESTORED Sacks Taken Penalty
-                + (rushYds / 10)
-                + (rushTDs * 6)
-                - (fumbles * 2);
+        switch (posGroup) {
+            case 'NFL_QB':
+                const passYds = parseFloat(s.passingYards) || 0;
+                const passTDs = parseFloat(s.passingTouchdowns) || 0;
+                const passInts = parseFloat(s.passingInts) || 0;
+                const rushYdsQB = parseFloat(s.rushingYards) || 0;
+                const rushTDsQB = parseFloat(s.rushingTouchdowns) || 0;
+                const sacksTaken = parseFloat(s.passingSacks) || 0;
+                rawScore = (passYds / 25) + (passTDs * 4) - (passInts * 2) - (sacksTaken * 0.5) + (rushYdsQB / 10) + (rushTDsQB * 6) - (fumbles * 2);
+                break;
+
+            case 'NFL_RB':
+                const rushYds = parseFloat(s.rushingYards) || 0;
+                const rushTDs = parseFloat(s.rushingTouchdowns) || 0;
+                const recYdsRB = parseFloat(s.receivingYards) || 0;
+                const recTDsRB = parseFloat(s.receivingTouchdowns) || 0;
+                const recRB = parseFloat(s.receptions) || 0;
+                rawScore = (rushYds / 10) + (rushTDs * 6) + (recYdsRB / 10) + (recTDsRB * 6) + (recRB * 0.5) - (fumbles * 2);
+                break;
+
+            case 'NFL_WR':
+            case 'NFL_TE': // TEs scored same as WRs but in their own group for Z-score
+                const recYds = parseFloat(s.receivingYards) || 0;
+                const recTDs = parseFloat(s.receivingTouchdowns) || 0;
+                const rec = parseFloat(s.receptions) || 0;
+                rawScore = (recYds / 10) + (recTDs * 6) + (rec * 1.0) - (fumbles * 2);
+                break;
+
+            case 'NFL_LB': // Linebackers (High Tackles, Sacks, INTs)
+                const tklLB = parseFloat(s.tackles) || 0;
+                const sckLB = parseFloat(s.sacks) || 0;
+                const intLB = parseFloat(s.defInterceptions) || 0;
+                const ffLB = parseFloat(s.fumblesForced) || 0;
+                rawScore = (tklLB * 1.5) + (sckLB * 4) + (intLB * 5) + (ffLB * 3);
+                break;
+
+            case 'NFL_CB': // Corners (PDs > Tackles)
+                const tklCB = parseFloat(s.tackles) || 0;
+                const intCB = parseFloat(s.defInterceptions) || 0;
+                const pdCB = parseFloat(s.passesDefended) || 0; // Not explicitly in report but standard
+                // Note: Report showed 'intTouchdowns', add that
+                const intTDCB = parseFloat(s.intTouchdowns) || 0;
+                rawScore = (tklCB * 1.0) + (intCB * 6) + (intTDCB * 6) + (pdCB * 3);
+                break;
+
+            case 'NFL_S': // Safeties (Hybrid)
+                const tklS = parseFloat(s.tackles) || 0;
+                const intS = parseFloat(s.defInterceptions) || 0;
+                const sckS = parseFloat(s.sacks) || 0;
+                rawScore = (tklS * 1.2) + (intS * 6) + (sckS * 3);
+                break;
+
+            case 'NFL_DE': // Edge Rushers
+                const sckDE = parseFloat(s.sacks) || 0;
+                const tklDE = parseFloat(s.tackles) || 0;
+                const ffDE = parseFloat(s.fumblesForced) || 0;
+                rawScore = (sckDE * 5) + (tklDE * 1.0) + (ffDE * 4);
+                break;
+
+            case 'NFL_DT': // Interior Linemen (Harder stats)
+                const sckDT = parseFloat(s.sacks) || 0;
+                const tklDT = parseFloat(s.tackles) || 0;
+                rawScore = (tklDT * 2.0) + (sckDT * 6); // Boosted multipliers for scarcity
+                break;
+
+            case 'NFL_OL': // O-Line (Reliability)
+                // Score strictly on Games Played (Reliability)
+                // Report confirms they have basically 0 stats
+                rawScore = (games * 10.0);
+                break;
+
+            case 'NFL_K':
+                const fgs = parseFloat(s.fieldGoalsMade) || 0;
+                const att = parseFloat(s.fieldGoalsAtt) || 0;
+                const misses = att - fgs;
+                // No 'longFieldGoal' found in report keys, using basic FGs
+                rawScore = (fgs * 3) - (misses * 1);
+                break;
+
+            case 'NFL_P':
+                const punts = parseFloat(s.punts) || 0;
+                // Basic volume for punters based on report keys
+                rawScore = (punts * 1) + (games * 2);
+                break;
+
+            case 'NFL_FB': // Fullbacks
+                // Report says: gamesPlayed, receptions, rushingAttempts, etc.
+                const ydsFB = (parseFloat(s.rushingYards) || 0) + (parseFloat(s.receivingYards) || 0);
+                const tdsFB = (parseFloat(s.rushingTouchdowns) || 0) + (parseFloat(s.receivingTouchdowns) || 0);
+                const recFB = parseFloat(s.receptions) || 0;
+                // Heavy weight on Games + Efficiency (since volume is low)
+                rawScore = (games * 5) + (ydsFB * 1.0) + (recFB * 2.0) + (tdsFB * 10);
+                break;
+
+            case 'NFL_LS': // Long Snappers
+                // Report says: gamesPlayed, tackles
+                const tklLS = parseFloat(s.tackles) || 0;
+                // Pure reliability score
+                rawScore = (games * 8) + (tklLS * 5);
+                break;
+
+            default:
+                rawScore = games * 2.0;
         }
 
-        // ✅ 2. DEFENSE (MOVED UP TO PREVENT "CORNERBACK" MATCHING "RB")
-        else if (['DE', 'DT', 'NT', 'DL', 'LB', 'ILB', 'OLB', 'MLB', 'CB', 'S', 'FS', 'SS', 'DB', 'DEFENSIVE', 'CORNERBACK', 'SAFETY'].some(r => pos.includes(r))) {
-            const tackles = parseFloat(s.tackles) || 0;
-            const sacks = parseFloat(s.sacks) || 0;
-            const ints = parseFloat(s.defInterceptions) || 0;
-            const pds = parseFloat(s.passesDefended) || 0;
-            const tfl = parseFloat(s.tfl) || 0;
-            const ff = parseFloat(s.fumblesForced) || 0;
-            const fr = parseFloat(s.fumblesRecovered) || 0;
-            const defTDs = (parseFloat(s.fumblesTouchdowns) || 0) + (parseFloat(s.intTouchdowns) || 0);
-
-            rawScore = (tackles * 1.5)
-                + (sacks * 4)
-                + (ints * 5)
-                + (pds * 2)
-                + (tfl * 2)
-                + (ff * 3)
-                + (fr * 3)
-                + (defTDs * 6);
-        }
-
-        // 3. RUNNING BACKS
-        else if (['RB', 'FB', 'HB', 'RUNNING BACK'].some(r => pos.includes(r))) {
-            const rushYds = parseFloat(s.rushingYards) || 0;
-            const rushTDs = parseFloat(s.rushingTouchdowns) || 0;
-            const recYds = parseFloat(s.receivingYards) || 0;
-            const recTDs = parseFloat(s.receivingTouchdowns) || 0;
-            const rec = parseFloat(s.receptions) || 0;
-
-            rawScore = (rushYds / 10)
-                + (rushTDs * 6)
-                + (recYds / 10)
-                + (recTDs * 6)
-                + (rec * 0.5) // 0.5 PPR (Restored explicit half-PPR)
-                - (fumbles * 2);
-        }
-
-        // 4. WIDE RECEIVERS / TIGHT ENDS
-        else if (['WR', 'TE', 'SE', 'FL', 'WIDE RECEIVER'].some(r => pos.includes(r))) {
-            const recYds = parseFloat(s.receivingYards) || 0;
-            const recTDs = parseFloat(s.receivingTouchdowns) || 0;
-            const rec = parseFloat(s.receptions) || 0;
-            const targets = parseFloat(s.receivingTargets) || 0;
-
-            // --- RESTORED CATCH RATE BONUS ---
-            const catchRate = targets > 0 ? (rec / targets) : 0;
-            const efficiencyBonus = catchRate > 0.70 ? 10 : 0;
-
-            rawScore = (recYds / 10)
-                + (recTDs * 6)
-                + (rec * 1.0) // 1.0 PPR (Restored explicit full-PPR)
-                + efficiencyBonus // RESTORED
-                - (fumbles * 2);
-        }
-
-        // 5. KICKERS
-        else if (pos.includes('KICKER') || pos === 'K') {
-            const fgs = parseFloat(s.fieldGoalsMade) || 0;
-            const att = parseFloat(s.fieldGoalsAtt) || 0;
-            const long = parseFloat(s.longFieldGoal) || 0;
-            const misses = att - fgs; // Calculated Misses
-
-            rawScore = (fgs * 3)
-                + (parseFloat(s.extraPointsMade) || 0) * 1 // Restored XP points
-                - (misses * 1) // RESTORED Miss Penalty
-                + (long > 50 ? 5 : 0); // Restored Long FG Bonus
-        }
-
-        // 6. PUNTERS
-        else if (pos.includes('PUNTER') || pos === 'P') {
-            const punts = parseFloat(s.punts) || 0;
-            const avg = parseFloat(s.puntAvg) || 0;
-            const in20 = parseFloat(s.puntsInside20) || 0;
-            const long = parseFloat(s.longPunt) || 0;
-
-            rawScore = (punts * 1) // Restored volume component
-                + (avg * 2) // Increased weight on average
-                + (in20 * 3) // Increased weight on inside 20
-                + (long > 60 ? 5 : 0); // Restored Long Punt Bonus
-        }
-
-        // 7. O-LINE / UNKNOWN
-        else {
-            rawScore = (parseFloat(s.gamesPlayed) || 0) * 1.5;
-        }
+        // Add Special Teams Bonus to everyone
+        rawScore += specialTeamsBonus;
     }
 
     return rawScore;
 };
 
-console.log('Players data module loaded (True Bell Curve - FIXED PRIORITY)');
+console.log('Players data module loaded (True Bell Curve - COMPREHENSIVE FIX)');
