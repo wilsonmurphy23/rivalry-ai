@@ -1,5 +1,5 @@
 /* ====================================
-   AUTH PAGE COMPONENT (ACCESSIBILITY & UI OVERHAUL)
+   AUTH PAGE COMPONENT (FIXED: SIGN UP LOGIC)
    ==================================== */
 
 const AuthPage = ({ onLogin }) => {
@@ -42,9 +42,17 @@ const AuthPage = ({ onLogin }) => {
 
                 if (error) throw error;
 
+                // ✅ FIX: Handle both "Email Confirmation" and "Auto-Login" scenarios
+
+                // Scenario A: Email confirmation required (Session is null)
                 if (data.user && !data.session) {
                     setSuccessMsg('✅ Confirmation email sent! Please check your inbox.');
-                    setLoading(false); // Stop loading so they can read the message
+                    setLoading(false);
+                }
+                // Scenario B: Auto-Login enabled (Session exists immediately)
+                else if (data.session) {
+                    console.log("Auto-login detected");
+                    window.location.reload();
                 }
             }
         } catch (err) {
@@ -55,13 +63,9 @@ const AuthPage = ({ onLogin }) => {
 
     return (
         <div className="min-h-screen flex flex-col items-center justify-center p-6 gradient-animated">
-            {/* UI/UX FIX: Changed from 'glass-strong' to a darker, more opaque background 
-               (bg-black/80) to ensure high contrast against the animated background.
-               Added shadow-2xl for depth.
-            */}
             <div className="w-full max-w-md bg-black/80 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
 
-                {/* Decorative top glow to maintain aesthetic without ruining contrast */}
+                {/* Decorative top glow */}
                 <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-600 to-pink-600"></div>
 
                 <div className="text-center mb-8 mt-2">
@@ -70,14 +74,14 @@ const AuthPage = ({ onLogin }) => {
                     <p className="text-gray-300 font-medium">The Ultimate Sports Debate Arena</p>
                 </div>
 
-                {/* ERROR MESSAGE - High Contrast Red */}
+                {/* ERROR MESSAGE */}
                 {error && (
                     <div className="bg-red-900/50 border border-red-500 text-white p-4 rounded-xl mb-6 text-sm font-bold text-center shadow-lg">
                         ⚠️ {error}
                     </div>
                 )}
 
-                {/* SUCCESS MESSAGE - High Contrast Green */}
+                {/* SUCCESS MESSAGE */}
                 {successMsg ? (
                     <div className="bg-green-900/50 border border-green-500 text-white p-6 rounded-xl mb-6 text-center fade-in shadow-lg">
                         <div className="text-4xl mb-2">📩</div>
@@ -109,7 +113,6 @@ const AuthPage = ({ onLogin }) => {
                         <div>
                             <label className="text-gray-300 text-xs font-bold ml-1 mb-1 block tracking-wider">EMAIL</label>
                             <div className="relative">
-                                {/* SVG Mail Icon inline for better UX */}
                                 <svg className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="16" x="2" y="4" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>
                                 <input
                                     type="email"
