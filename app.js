@@ -1,5 +1,5 @@
 /* ====================================
-   RIVALRY AI - MAIN APP (ARROWS FIX)
+   RIVALRY AI - MAIN APP (WITH INFO MODAL)
    ==================================== */
 
 const { useState, useEffect, useRef, useMemo } = React;
@@ -13,6 +13,9 @@ const RivalryAI = () => {
     const [loading, setLoading] = useState(true);
     const [userVotes, setUserVotes] = useState({});
     const [userLikes, setUserLikes] = useState({});
+
+    // ✅ NEW: State for Info Modal
+    const [showInfo, setShowInfo] = useState(false);
 
     // Feed State
     const [feedFilter, setFeedFilter] = useState('all');
@@ -189,6 +192,14 @@ const RivalryAI = () => {
                             <Icon name="trophy" size={20} className="text-white" />
                         </div>
                         <span className="text-xl font-black text-white">Rivalry AI</span>
+
+                        {/* ✅ NEW: Info Icon in Header */}
+                        <button
+                            onClick={() => setShowInfo(true)}
+                            className="w-6 h-6 rounded-full border border-gray-500 flex items-center justify-center text-gray-400 hover:text-white hover:border-white smooth ml-1"
+                        >
+                            <span className="text-xs font-serif font-bold italic">i</span>
+                        </button>
                     </div>
                     <div
                         className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-lg cursor-pointer hover-scale smooth"
@@ -288,7 +299,6 @@ const RivalryAI = () => {
                         )}
                     </div>
 
-                    {/* ✅ FIXED: Arrows hidden if looking at a specific matchup */}
                     {!window.location.search.includes('matchup=') && (
                         <div className="fixed right-8 top-1/2 -translate-y-1/2 z-50 hidden md:flex flex-col gap-4">
                             <button
@@ -328,6 +338,56 @@ const RivalryAI = () => {
             {currentView === 'players' && <PlayersPage allPlayers={window.allPlayers} />}
             {currentView === 'profile' && <ProfilePage currentUser={currentUser} userVotes={userVotes} matchups={matchups} />}
             <BottomNav currentView={currentView} setCurrentView={setCurrentView} />
+
+            {/* ✅ NEW: Info Modal */}
+            {showInfo && (
+                <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center p-6 fade-in backdrop-blur-md bg-black/60"
+                    onClick={() => setShowInfo(false)}
+                >
+                    <div
+                        className="glass-strong rounded-3xl p-8 max-w-md w-full scale-in relative border border-white/20 shadow-2xl"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <button onClick={() => setShowInfo(false)} className="absolute top-4 right-4 text-gray-400 hover:text-white p-2">
+                            <Icon name="x" size={24} />
+                        </button>
+
+                        <div className="text-center mb-6">
+                            <div className="w-16 h-16 bg-gradient-to-br from-purple-600 to-pink-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg glow-purple">
+                                <Icon name="trophy" size={32} className="text-white" />
+                            </div>
+                            <h2 className="text-2xl font-black text-white">Welcome to Rivalry AI</h2>
+                        </div>
+
+                        <div className="space-y-4 text-gray-300 text-sm leading-relaxed">
+                            <p>
+                                <strong className="text-white">The Ultimate Debate Arena.</strong> This platform uses real-time 2025 NBA & NFL stats to settle fan arguments once and for all.
+                            </p>
+                            <p>
+                                <strong>How it works:</strong> Choose who is better in head-to-head matchups. Once you vote, the <span className="text-purple-400 font-bold">Fog of War</span> lifts, revealing deep stats and AI analysis.
+                            </p>
+                            <div className="bg-white/5 p-4 rounded-xl border-l-2 border-purple-500">
+                                <h3 className="text-white font-bold text-xs uppercase mb-1">About VOR Ratings</h3>
+                                <p className="text-xs text-gray-400">
+                                    Each player has a calculated <strong>VOR (Value Over Replacement)</strong> score (0-99). This score is <em>relative to their position</em> based on current season performance.
+                                </p>
+                                <p className="text-xs text-gray-400 mt-2">
+                                    <em>Example:</em> A QB with a 90 rating is elite compared to other QBs. A Cornerback with a 90 rating is elite compared to other Cornerbacks. This allows for fair cross-position debates!
+                                </p>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={() => setShowInfo(false)}
+                            className="w-full mt-8 bg-white text-black font-black py-3 rounded-xl hover:scale-[1.02] smooth"
+                        >
+                            Got it!
+                        </button>
+                    </div>
+                </div>
+            )}
+
         </div>
     );
 };
