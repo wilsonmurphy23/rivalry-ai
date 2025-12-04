@@ -1,5 +1,5 @@
 /* ====================================
-   MATCHUP CARD (FIXED: COPIED STATE + UI)
+   MATCHUP CARD (FIXED: DEFENSE STATS PRIORITY)
    ==================================== */
 
 const MatchupCard = ({ matchup, userVotes, setUserVotes, userLikes, setUserLikes, setMatchups, feedRef }) => {
@@ -65,7 +65,6 @@ const MatchupCard = ({ matchup, userVotes, setUserVotes, userLikes, setUserLikes
         } catch (err) { console.error("Like failed:", err); }
     };
 
-    // ✅ FIXED: Handle Share with React State
     const handleShare = async () => {
         try {
             const url = new URL(window.location.href);
@@ -110,12 +109,25 @@ const MatchupCard = ({ matchup, userVotes, setUserVotes, userLikes, setUserLikes
                 <Stat l="STL" v={s.stl} /><Stat l="BLK" v={s.blk} /><Stat l="FG%" v={`${s.fgPct}%`} />
             </StatRow>;
         }
-        if (pos.includes('QB')) {
+
+        if (pos.includes('QB') || pos.includes('QUARTERBACK')) {
             return <StatRow>
                 <Stat l="Pass Yds" v={s.passingYards} /><Stat l="TDs" v={s.passingTouchdowns} /><Stat l="Ints" v={s.passingInts} />
                 {parseFloat(s.rushingYards) > 50 && <Stat l="Rush Yds" v={s.rushingYards} />}
             </StatRow>;
         }
+
+        // ✅ FIXED: Defense Check moved ABOVE Offense Check
+        // Also added 'CORNERBACK' and 'SAFETY' explicitly to prevent false positive match on "RB" inside "CORNERBACK"
+        if (['DE', 'DT', 'NT', 'DL', 'LB', 'ILB', 'OLB', 'MLB', 'CB', 'S', 'FS', 'SS', 'DB', 'DEFENSIVE', 'CORNERBACK', 'SAFETY'].some(r => pos.includes(r))) {
+            return <StatRow>
+                <Stat l="Tackles" v={s.tackles} />
+                <Stat l="Sacks" v={s.sacks} />
+                <Stat l="Ints" v={s.defInterceptions || s.interceptions || 0} />
+                {parseFloat(s.passesDefended) > 0 && <Stat l="PD" v={s.passesDefended} />}
+            </StatRow>;
+        }
+
         if (['RB', 'FB', 'HB', 'WR', 'TE', 'SE', 'FL'].some(r => pos.includes(r))) {
             return <StatRow>
                 <Stat l="Rush Yds" v={s.rushingYards || 0} />
@@ -124,14 +136,7 @@ const MatchupCard = ({ matchup, userVotes, setUserVotes, userLikes, setUserLikes
                 <Stat l="Rec" v={s.receptions || 0} />
             </StatRow>;
         }
-        if (['DE', 'DT', 'NT', 'DL', 'LB', 'ILB', 'OLB', 'MLB', 'CB', 'S', 'FS', 'SS', 'DB'].some(r => pos.includes(r))) {
-            return <StatRow>
-                <Stat l="Tackles" v={s.tackles} />
-                <Stat l="Sacks" v={s.sacks} />
-                <Stat l="Ints" v={s.defInterceptions || s.interceptions || 0} />
-                {parseFloat(s.passesDefended) > 0 && <Stat l="PD" v={s.passesDefended} />}
-            </StatRow>;
-        }
+
         if (pos.includes('KICKER') || pos === 'K') {
             return <StatRow><Stat l="FGs" v={s.fieldGoalsMade} /><Stat l="Long" v={s.longFieldGoal} /></StatRow>;
         }
@@ -224,11 +229,7 @@ const MatchupCard = ({ matchup, userVotes, setUserVotes, userLikes, setUserLikes
                                     <span className="text-xs">{window.formatNumber(matchup.comments_count || 0)}</span>
                                 </button>
 
-                                {/* ✅ FIXED: Updated Share Button with Feedback */}
-                                <button
-                                    onClick={handleShare}
-                                    className="px-4 py-3 rounded-xl border-2 border-gray-600 text-gray-400 font-bold smooth hover:border-white hover:text-white flex items-center gap-1.5"
-                                >
+                                <button onClick={handleShare} className="px-4 py-3 rounded-xl border-2 border-gray-600 text-gray-400 font-bold smooth hover:border-white hover:text-white flex items-center gap-1.5">
                                     {isCopied ? (
                                         <span className="text-green-400 text-xs font-black animate-pulse">COPIED!</span>
                                     ) : (
@@ -280,7 +281,6 @@ const MatchupCard = ({ matchup, userVotes, setUserVotes, userLikes, setUserLikes
                                     <span className="text-xs">{window.formatNumber(matchup.comments_count || 0)}</span>
                                 </button>
 
-                                {/* ✅ FIXED: Updated Share Button with Feedback (Mobile) */}
                                 <button onClick={handleShare} className="px-4 py-3 rounded-xl border-2 border-gray-600 text-gray-400 font-bold smooth hover:border-white hover:text-white flex items-center gap-1.5">
                                     {isCopied ? (
                                         <span className="text-green-400 text-xs font-black animate-pulse">COPIED!</span>

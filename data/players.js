@@ -1,5 +1,5 @@
 /* ====================================
-   PLAYERS DATA - DYNAMIC BELL CURVE (TRUE DISTRIBUTION) - UPGRADED
+   PLAYERS DATA - DYNAMIC BELL CURVE (TRUE DISTRIBUTION) - FIXED
    ==================================== */
 
 const SUPABASE_URL = 'https://qnplrybkdcwngzofufcw.supabase.co';
@@ -111,11 +111,15 @@ const getPositionGroup = (sport, position) => {
 
     const pos = position ? position.toUpperCase() : 'UNKNOWN';
     if (pos.includes('QUARTERBACK') || pos === 'QB') return 'NFL_QB';
+
+    // ✅ FIXED: Defense Check First to prevent Cornerback matching RB
+    if (['DE', 'DT', 'NT', 'DL', 'LB', 'ILB', 'OLB', 'MLB', 'CB', 'S', 'FS', 'SS', 'DB', 'DEFENSIVE', 'CORNERBACK', 'SAFETY'].some(r => pos.includes(r))) return 'NFL_DEF';
+
     if (['RB', 'FB', 'HB'].some(r => pos.includes(r))) return 'NFL_RB';
     if (['WR', 'TE', 'SE', 'FL'].some(r => pos.includes(r))) return 'NFL_WR';
     if (pos.includes('KICKER') || pos === 'K') return 'NFL_K';
     if (pos.includes('PUNTER') || pos === 'P') return 'NFL_P';
-    if (['DE', 'DT', 'NT', 'DL', 'LB', 'ILB', 'OLB', 'MLB', 'CB', 'S', 'FS', 'SS', 'DB'].some(r => pos.includes(r))) return 'NFL_DEF';
+
     return 'NFL_OTHER';
 };
 
@@ -179,7 +183,28 @@ const calculateRawScore = (s, sport, position) => {
                 - (fumbles * 2);
         }
 
-        // 2. RUNNING BACKS
+        // ✅ 2. DEFENSE (MOVED UP TO PREVENT "CORNERBACK" MATCHING "RB")
+        else if (['DE', 'DT', 'NT', 'DL', 'LB', 'ILB', 'OLB', 'MLB', 'CB', 'S', 'FS', 'SS', 'DB', 'DEFENSIVE', 'CORNERBACK', 'SAFETY'].some(r => pos.includes(r))) {
+            const tackles = parseFloat(s.tackles) || 0;
+            const sacks = parseFloat(s.sacks) || 0;
+            const ints = parseFloat(s.defInterceptions) || 0;
+            const pds = parseFloat(s.passesDefended) || 0;
+            const tfl = parseFloat(s.tfl) || 0;
+            const ff = parseFloat(s.fumblesForced) || 0;
+            const fr = parseFloat(s.fumblesRecovered) || 0;
+            const defTDs = (parseFloat(s.fumblesTouchdowns) || 0) + (parseFloat(s.intTouchdowns) || 0);
+
+            rawScore = (tackles * 1.5)
+                + (sacks * 4)
+                + (ints * 5)
+                + (pds * 2)
+                + (tfl * 2)
+                + (ff * 3)
+                + (fr * 3)
+                + (defTDs * 6);
+        }
+
+        // 3. RUNNING BACKS
         else if (['RB', 'FB', 'HB', 'RUNNING BACK'].some(r => pos.includes(r))) {
             const rushYds = parseFloat(s.rushingYards) || 0;
             const rushTDs = parseFloat(s.rushingTouchdowns) || 0;
@@ -195,7 +220,7 @@ const calculateRawScore = (s, sport, position) => {
                 - (fumbles * 2);
         }
 
-        // 3. WIDE RECEIVERS / TIGHT ENDS
+        // 4. WIDE RECEIVERS / TIGHT ENDS
         else if (['WR', 'TE', 'SE', 'FL', 'WIDE RECEIVER'].some(r => pos.includes(r))) {
             const recYds = parseFloat(s.receivingYards) || 0;
             const recTDs = parseFloat(s.receivingTouchdowns) || 0;
@@ -211,29 +236,6 @@ const calculateRawScore = (s, sport, position) => {
                 + (rec * 1.0) // 1.0 PPR (Restored explicit full-PPR)
                 + efficiencyBonus // RESTORED
                 - (fumbles * 2);
-        }
-
-        // 4. DEFENSE / DEFENSIVE FRONT / SECONDARY
-        else if (['DE', 'DT', 'NT', 'DL', 'LB', 'ILB', 'OLB', 'MLB', 'CB', 'S', 'FS', 'SS', 'DB', 'DEFENSIVE', 'CORNERBACK', 'SAFETY'].some(r => pos.includes(r))) {
-            // The old DEF/DB split logic is removed here to match the cleaner posGroup logic,
-            // using the combined scoring from the detailed DEFENSIVE FRONT section (as it was more comprehensive)
-            const tackles = parseFloat(s.tackles) || 0;
-            const sacks = parseFloat(s.sacks) || 0;
-            const ints = parseFloat(s.defInterceptions) || 0;
-            const pds = parseFloat(s.passesDefended) || 0;
-            const tfl = parseFloat(s.tfl) || 0;
-            const ff = parseFloat(s.fumblesForced) || 0;
-            const fr = parseFloat(s.fumblesRecovered) || 0;
-            const defTDs = (parseFloat(s.fumblesTouchdowns) || 0) + (parseFloat(s.intTouchdowns) || 0);
-
-            rawScore = (tackles * 1.5)
-                + (sacks * 4)
-                + (ints * 5)
-                + (pds * 2) // Re-added PDs from old DB logic
-                + (tfl * 2) // Re-added TFL from old DEF logic
-                + (ff * 3) // Re-added FF from old DEF logic
-                + (fr * 3) // Re-added FR from old DEF logic
-                + (defTDs * 6); // Re-added TDs from old DEF logic
         }
 
         // 5. KICKERS
@@ -271,4 +273,4 @@ const calculateRawScore = (s, sport, position) => {
     return rawScore;
 };
 
-console.log('Players data module loaded (True Bell Curve - FULL)');
+console.log('Players data module loaded (True Bell Curve - FIXED PRIORITY)');
