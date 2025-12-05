@@ -1,199 +1,204 @@
-# 🎨 RIVALRY AI - IMPROVED VERSION
+# 🏀 Rivalry AI
 
-## ✨ WHAT'S NEW
+### AI-Powered Sports Debate Platform
 
-This version fixes the two issues you reported:
+[![Live Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://rivalry-ai.onrender.com/)
+[![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/)
+[![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://reactjs.org/)
 
-### 1. ❌ Bland AI Analysis → ✅ Engaging Analysis
-**Before:**
-```
-Claude Al Analysis
-**Analysis:** Stephen Curry (24.7 PPG, 4.5 RPG, 6.0 APG) faces off 
-against LeBron James (24.4 PPG, 7.8 RPG, 8.2 APG). Stephen Curry leads 
-in scoring with 24.7 PPG. Both are elite performers...
-```
+> Vote on NBA and NFL player matchups, unlock AI-generated analysis, and engage with data-driven sports debates.
 
-**After:**
-- Better prompt engineering → More engaging responses
-- Actually uses Claude's analysis capabilities
-- Specific insights about playstyles and strengths
-- Numbers in context, not just listed
-- Feels like a real sports analyst
-
-### 2. ❌ Ugly Alert Popup → ✅ Beautiful Modal
-**Before:**
-- Browser alert() popup
-- No styling
-- Can't close easily
-- Looks amateur
-
-**After:**
-- ✨ Beautiful glass morphism modal
-- 🎨 Gradient header with icon
-- ⏳ Loading spinner while analyzing
-- 🔄 Regenerate button
-- ❌ Easy close button
-- 📱 Click outside to dismiss
-- 🎭 Smooth fade-in animation
+**🔗 Live Demo:** [rivalry-ai.onrender.com](https://rivalry-ai.onrender.com/)
 
 ---
 
-## 🚀 START THE APP
+## 📋 Table of Contents
+- [What is Rivalry AI?](#what-is-rivalry-ai)
+- [Quick Start](#quick-start)
+- [Features](#features)
+- [How to Use](#how-to-use)
+- [Tech Stack](#tech-stack)
+- [How It Works](#how-it-works)
+- [Contributing](#contributing)
+- [License](#license)
 
+---
+
+## 🎯 What is Rivalry AI?
+
+Rivalry AI is a sports debate platform where you can:
+- Create head-to-head matchups between NBA and NFL players
+- Vote on who's better (stats hidden until you vote)
+- Get AI-powered analysis explaining the matchup
+- Compare players fairly across different positions
+
+**2,228 active players** from NBA and NFL ready to debate.
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Python 3.9+
+- Git
+
+### Setup
+
+1. **Clone the repository**
 ```bash
-cd IMPROVED
-
-# Mac/Linux:
-./start-server.sh
-
-# Windows:
-start-server.bat
-
-# Manual:
-python3 -m http.server 8000
-
-# Visit: http://localhost:8000
+git clone https://github.com/wilsonmurphy23/rivalry-ai.git
+cd rivalry-ai
 ```
+
+2. **Install dependencies**
+```bash
+pip install -r requirements.txt
+```
+
+3. **Set up environment variables**
+
+Create a `.env` file:
+```env
+ANTHROPIC_API_KEY=your_api_key_here
+SUPABASE_URL=your_supabase_url
+SUPABASE_ANON_KEY=your_supabase_key
+```
+
+4. **Start the server**
+```bash
+python server.py
+```
+Server runs on `localhost:8000`
+
+5. **Open the app**
+- Open `index.html` in your browser
+- Or run: `python -m http.server 3000`
+
+**Live version:** [rivalry-ai.onrender.com](https://rivalry-ai.onrender.com/)
 
 ---
 
-## 📂 WHAT'S INSIDE
+## ✨ Features
 
-```
-IMPROVED/
-├── index.html
-├── app.js
-├── start-server.sh / .bat
-│
-├── data/
-│   ├── players.js           ← Same (Supabase)
-│   ├── api.js               ← ✨ IMPROVED (better prompts)
-│   └── users.js             ← Same
-│
-├── components/
-│   ├── MatchupCard.js       ← ✨ IMPROVED (modal instead of alert)
-│   ├── Icons.js             ← Same
-│   ├── TrendingPage.js      ← Same
-│   ├── CreatePage.js        ← Same
-│   ├── ProfilePage.js       ← Same
-│   └── BottomNav.js         ← Same
-│
-├── styles/
-│   └── main.css             ← Same (full styling)
-│
-└── utils/
-    └── helpers.js           ← Same
-```
+## ✨ Features
+
+### 🔒 Fog of War
+Stats are hidden until you vote - prevents bias and makes debates more engaging.
+
+### 📊 Fair Player Comparisons (VOR Algorithm)
+Compare quarterbacks to linebackers fairly using position-specific statistical normalization. Every player gets a rating 40-99 where 75 = average.
+
+### 🤖 AI Analysis
+Get Claude 3 Haiku-powered analysis after voting. Cites specific stats and gives direct opinions.
+
+### 🔍 Smart Search
+- Filter by sport, team, position, or name
+- 2,228 players with real-time stats
+- Position-specific stat displays
+
+### 🎮 Social Features
+- Like and share matchups
+- Comment on debates
+- Unique URLs for each matchup
+- Duplicate detection
 
 ---
 
-## 🎯 KEY IMPROVEMENTS
+## 📖 How to Use
 
-### API (data/api.js)
-✅ **Better Prompt**
-- More specific instructions for Claude
-- Asks for engaging, ESPN-style analysis
-- Requests specific statistical comparisons
-- Avoids corporate speak
+## 📖 How to Use
 
-✅ **Better Error Handling**
-- Shows actual API errors in console
-- Fallback explains what went wrong
-- Easier to debug
+**Create a Matchup:**
+1. Go to "Create" tab
+2. Select sport (NBA/NFL)
+3. Filter by team, position, or search by name
+4. Pick two players
 
-✅ **Shorter Token Limit**
-- 300 tokens (was 1024)
-- Forces Claude to be concise
-- Faster responses
+**Vote and Analyze:**
+1. View matchup in main feed
+2. Vote (stats are hidden)
+3. Stats reveal after voting
+4. Click "Get AI Analysis" for breakdown
 
-### MatchupCard (components/MatchupCard.js)
-✅ **Beautiful Modal**
-- Glass morphism design
-- Gradient header
-- Loading animation
-- Regenerate button
-- Easy close
-
-✅ **Better UX**
-- Shows loading state
-- Click outside to close
-- Smooth animations
-- Professional feel
+**Search Players:**
+1. Go to "Players" tab
+2. Use filters or search
+3. View position-specific stats
 
 ---
 
-## 🎮 HOW TO USE
+## 🛠️ Tech Stack
 
-1. **Start the server** (see above)
-2. **Open browser**: http://localhost:8000
-3. **Click on players** to vote
-4. **Click "🤖 Get AI Analysis"**
-5. **See beautiful modal** with Claude's analysis!
-
-### In the Modal:
-- **While analyzing**: See loading spinner
-- **After complete**: Read Claude's analysis
-- **Regenerate**: Get a new analysis
-- **Close**: Click X or outside modal
+- **Frontend**: React 18, Tailwind CSS
+- **Backend**: Python, Supabase (PostgreSQL)
+- **AI**: Claude 3 Haiku API
+- **Data**: BallDontLie API
+- **Deployment**: Render
 
 ---
 
-## 🔍 DEBUGGING
+## 🧮 How It Works
 
-If you still see bland analysis, check browser console (F12):
+## 🧮 How It Works
 
-### You should see:
-```
-🤖 Getting Claude AI analysis: Stephen Curry vs LeBron James...
-✅ Claude analysis received!
-```
+### VOR Algorithm (Value Over Replacement)
+Enables fair cross-position comparisons using 3 steps:
 
-### If you see errors:
-```
-❌ Claude API error: [error message]
-```
+**Step 1: Calculate Raw Scores**
+- Each position has custom formulas
+- NBA: points, rebounds, assists, steals, blocks
+- NFL QB: passing yards, TDs, interceptions
+- NFL Defense: tackles, sacks, interceptions
 
-Common issues:
-- **API key invalid**: Check `data/api.js`
-- **No credits**: Add credits to your Claude API account
-- **CORS error**: Make sure you're running from server (not file://)
-- **Network error**: Check internet connection
+**Step 2: Analyze Each Position Group**
+- Calculate average and standard deviation per position
+- Groups: NBA, NFL_QB, NFL_RB, NFL_WR, NFL_DEF, etc.
 
----
+**Step 3: Normalize to 40-99 Scale**
+- Use z-score transformation
+- 75 = average, 85 = great, 90 = elite, 95 = exceptional
+- Fair comparisons: QB rated 88 vs LB rated 85
 
-## 📊 EXAMPLE ANALYSIS
-
-With the improved prompts, you'll get responses like:
-
-```
-This is a fascinating clash of generations and playstyles! Curry's 
-24.7 PPG showcases his continued elite scoring, but LeBron's 
-well-rounded 24.4/7.8/8.2 line demonstrates his incredible 
-all-around game even in Year 22. While Curry maintains his 
-gravitational pull from three-point range, LeBron's superior 
-playmaking (8.2 APG vs 6.0) and rebounding give him the edge 
-in overall impact. In a vacuum comparing 2024 stats, I'd lean 
-LeBron for his versatility, though Curry's shooting efficiency 
-remains unmatched.
-```
-
-Instead of:
-```
-Both are elite performers with strong 2024 campaigns.
-```
+### AI Integration
+- **Proxy Server**: Python backend secures API keys
+- **Smart Prompts**: Engineered to avoid generic responses
+- **Format**: 2-3 sentence analysis with specific stats
 
 ---
 
-## 🎉 THAT'S IT!
+## 🤝 Contributing
 
-Same app, but now with:
-- ✅ Better AI analysis
-- ✅ Beautiful modal display
-- ✅ Professional feel
-- ✅ Easier to debug
+Pull requests welcome! 
+
+1. Fork the repo
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit changes (`git commit -m 'Add AmazingFeature'`)
+4. Push to branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
 ---
 
-**Total Files**: 15  
-**Status**: ✅ Ready to use  
-**Improvements**: 2 major fixes
+## 📝 License
+
+MIT License - see [LICENSE](LICENSE) file
+
+---
+
+## 🔗 Links
+
+- **Live Demo**: [rivalry-ai.onrender.com](https://rivalry-ai.onrender.com/)
+- **GitHub**: [github.com/wilsonmurphy23/rivalry-ai](https://github.com/wilsonmurphy23/rivalry-ai)
+- **Issues**: [Report a bug](https://github.com/wilsonmurphy23/rivalry-ai/issues)
+
+---
+
+## 🙏 Credits
+
+- [Anthropic](https://www.anthropic.com/) - Claude 3 Haiku API
+- [BallDontLie](https://www.balldontlie.io/) - NBA/NFL statistics
+- [Supabase](https://supabase.com/) - Database and auth
+- [Tailwind CSS](https://tailwindcss.com/) - Styling
+
+---
+
+<p align="center">Built with AI assistance • 2,228 players • 18 files • 6 weeks</p>
