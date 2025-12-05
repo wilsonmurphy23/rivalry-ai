@@ -78,6 +78,30 @@ Server runs on `localhost:8000`
 
 ---
 
+## 📸 Screenshots
+
+### Main Feed
+![Main Feed](docs/screenshots/main-feed.png)
+*Vote on player matchups with swipeable cards*
+
+### Create Matchup
+![Create Matchup](docs/screenshots/create-matchup.png)
+*Filter by sport, team, position, or search by name to create debates*
+
+### Fog of War - Stats Locked
+![Stats Locked](docs/screenshots/locked.png)
+*Stats remain hidden until you vote - prevents bias*
+
+### Players Page
+![Players Page](docs/screenshots/players-page.png)
+*Browse all 2,228 players with VOR ratings and filters*
+
+### Player Stats Detail
+![Player Stats](docs/screenshots/players-stat.png)
+*Click any player to see detailed statistics and VOR breakdown*
+
+---
+
 ## ✨ Features
 
 ## ✨ Features
