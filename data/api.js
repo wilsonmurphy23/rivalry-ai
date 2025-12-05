@@ -13,7 +13,7 @@ window.getClaudeAnalysis = async (player1, player2) => {
         const formatStats = (player) => {
             const s = player.stats || {};
             if (player.sport === 'NBA') {
-                return `2024 Stats: ${s.ppg} PPG, ${s.rpg} RPG, ${s.apg} APG, ${s.stl} STL, ${s.blk} BLK.`;
+                return `2025 Stats: ${s.ppg} PPG, ${s.rpg} RPG, ${s.apg} APG, ${s.stl} STL, ${s.blk} BLK.`;
             } else {
                 // NFL - Smart Stat String
                 let parts = [];
@@ -24,7 +24,7 @@ window.getClaudeAnalysis = async (player1, player2) => {
                 if (s.fieldGoalsMade) parts.push(`${s.fieldGoalsMade} FGs made (Long: ${s.longFieldGoal})`);
                 if (s.punts) parts.push(`${s.punts} punts (Avg: ${s.puntAvg})`);
 
-                return `2024 Stats: ${parts.join(' | ') || 'No stats available'}`;
+                return `2025 Stats: ${parts.join(' | ') || 'No stats available'}`;
             }
         };
 
@@ -36,7 +36,7 @@ window.getClaudeAnalysis = async (player1, player2) => {
             body: JSON.stringify({
                 messages: [{
                     role: 'user',
-                    content: `Compare ${player1.name} (${player1.position}) and ${player2.name} (${player2.position}) based on these 2024 stats:
+                    content: `Compare ${player1.name} (${player1.position}) and ${player2.name} (${player2.position}) based on these 2025 stats:
 
 ${player1.name}: ${formatStats(player1)}
 ${player2.name}: ${formatStats(player2)}
