@@ -1,5 +1,6 @@
 /* ====================================
-   MATCHUP CARD (FIXED: DEFENSE STATS PRIORITY)
+   MATCHUP CARD
+   ✅ FIXED: Stats display using posGroup instead of position string matching
    ==================================== */
 
 const MatchupCard = ({ matchup, userVotes, setUserVotes, userLikes, setUserLikes, setMatchups, feedRef }) => {
@@ -17,7 +18,7 @@ const MatchupCard = ({ matchup, userVotes, setUserVotes, userLikes, setUserLikes
     const [showComments, setShowComments] = React.useState(false);
     const [analysis, setAnalysis] = React.useState('');
 
-    // ✅ NEW: State for share feedback
+    // State for share feedback
     const [isCopied, setIsCopied] = React.useState(false);
 
     // Safe Player Objects
@@ -89,10 +90,10 @@ const MatchupCard = ({ matchup, userVotes, setUserVotes, userLikes, setUserLikes
         } catch (error) { setAnalysis('Error getting analysis.'); } finally { setIsAnalyzing(false); }
     };
 
-    // Stats Renderer
+    // ✅ FIXED: Stats Renderer - Now uses posGroup instead of position string matching
     const renderStats = (player) => {
         const s = player.stats || {};
-        const pos = player.position ? player.position.toUpperCase() : '';
+        const posGroup = player.posGroup || 'UNKNOWN';
 
         const Stat = ({ l, v }) => (
             <div className="flex flex-col min-w-[50px] mb-2">
@@ -103,23 +104,32 @@ const MatchupCard = ({ matchup, userVotes, setUserVotes, userLikes, setUserLikes
 
         const StatRow = ({ children }) => <div className="flex flex-wrap gap-x-4 gap-y-2">{children}</div>;
 
-        if (player.sport === 'NBA') {
+        // NBA - All positions use same stats
+        if (player.sport === 'NBA' || posGroup === 'NBA') {
             return <StatRow>
-                <Stat l="PPG" v={s.ppg} /><Stat l="RPG" v={s.rpg} /><Stat l="APG" v={s.apg} />
-                <Stat l="STL" v={s.stl} /><Stat l="BLK" v={s.blk} /><Stat l="FG%" v={`${s.fgPct}%`} />
+                <Stat l="PPG" v={s.ppg} />
+                <Stat l="RPG" v={s.rpg} />
+                <Stat l="APG" v={s.apg} />
+                <Stat l="STL" v={s.stl} />
+                <Stat l="BLK" v={s.blk} />
+                <Stat l="FG%" v={`${s.fgPct}%`} />
             </StatRow>;
         }
 
-        if (pos.includes('QB') || pos.includes('QUARTERBACK')) {
+        // NFL - Use posGroup for accurate matching
+
+        // Quarterbacks
+        if (posGroup === 'NFL_QB') {
             return <StatRow>
-                <Stat l="Pass Yds" v={s.passingYards} /><Stat l="TDs" v={s.passingTouchdowns} /><Stat l="Ints" v={s.passingInts} />
+                <Stat l="Pass Yds" v={s.passingYards} />
+                <Stat l="TDs" v={s.passingTouchdowns} />
+                <Stat l="Ints" v={s.passingInts} />
                 {parseFloat(s.rushingYards) > 50 && <Stat l="Rush Yds" v={s.rushingYards} />}
             </StatRow>;
         }
 
-        // ✅ FIXED: Defense Check moved ABOVE Offense Check
-        // Also added 'CORNERBACK' and 'SAFETY' explicitly to prevent false positive match on "RB" inside "CORNERBACK"
-        if (['DE', 'DT', 'NT', 'DL', 'LB', 'ILB', 'OLB', 'MLB', 'CB', 'S', 'FS', 'SS', 'DB', 'DEFENSIVE', 'CORNERBACK', 'SAFETY'].some(r => pos.includes(r))) {
+        // Defensive Players
+        if (['NFL_LB', 'NFL_CB', 'NFL_S', 'NFL_DE', 'NFL_DT'].includes(posGroup)) {
             return <StatRow>
                 <Stat l="Tackles" v={s.tackles} />
                 <Stat l="Sacks" v={s.sacks} />
@@ -128,7 +138,8 @@ const MatchupCard = ({ matchup, userVotes, setUserVotes, userLikes, setUserLikes
             </StatRow>;
         }
 
-        if (['RB', 'FB', 'HB', 'WR', 'TE', 'SE', 'FL'].some(r => pos.includes(r))) {
+        // Running Backs, Fullbacks, Wide Receivers, Tight Ends
+        if (['NFL_RB', 'NFL_FB', 'NFL_WR', 'NFL_TE'].includes(posGroup)) {
             return <StatRow>
                 <Stat l="Rush Yds" v={s.rushingYards || 0} />
                 <Stat l="Rec Yds" v={s.receivingYards || 0} />
@@ -137,13 +148,17 @@ const MatchupCard = ({ matchup, userVotes, setUserVotes, userLikes, setUserLikes
             </StatRow>;
         }
 
-        if (pos.includes('KICKER') || pos === 'K') {
+        // Kickers
+        if (posGroup === 'NFL_K') {
             return <StatRow><Stat l="FGs" v={s.fieldGoalsMade} /><Stat l="Long" v={s.longFieldGoal} /></StatRow>;
         }
-        if (pos.includes('PUNTER') || pos === 'P') {
+
+        // Punters
+        if (posGroup === 'NFL_P') {
             return <StatRow><Stat l="Punts" v={s.punts} /><Stat l="Avg" v={s.puntAvg} /></StatRow>;
         }
 
+        // Fallback
         return <StatRow><Stat l="Games" v={s.gamesPlayed} /></StatRow>;
     };
 

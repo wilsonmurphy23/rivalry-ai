@@ -1,5 +1,6 @@
 /* ====================================
    CREATE PAGE (DUPLICATE DETECTION & REVIVAL)
+   ✅ FIXED: Position normalization to prevent duplicates
    ==================================== */
 
 const CreatePage = ({
@@ -33,7 +34,13 @@ const CreatePage = ({
 
         sportPlayers.forEach(p => {
             if (p.teams && p.teams[0]) teams.add(p.teams[0]);
-            if (p.position) positions.add(p.position);
+
+            // ✅ FIXED: Normalize positions to Title Case to merge duplicates
+            // This matches the logic in PlayersPage.js
+            if (p.position) {
+                const normalized = p.position.toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+                positions.add(normalized);
+            }
         });
 
         return {
@@ -49,7 +56,16 @@ const CreatePage = ({
             const q = search.toLowerCase();
             result = result.filter(p => p.name.toLowerCase().includes(q));
         }
-        if (positionFilter !== 'all') result = result.filter(p => p.position === positionFilter);
+
+        // ✅ FIXED: Match against normalized position
+        if (positionFilter !== 'all') {
+            result = result.filter(p => {
+                if (!p.position) return false;
+                const normalized = p.position.toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+                return normalized === positionFilter;
+            });
+        }
+
         return result.sort((a, b) => {
             if (sortBy === 'name') return a.name.localeCompare(b.name);
             if (sortBy === 'team') return (a.teams[0] || '').localeCompare(b.teams[0] || '');
@@ -127,32 +143,32 @@ const CreatePage = ({
             setMatchups(prev => [completeMatchup, ...prev]);
 
             resetAndRedirect();
-
         } catch (err) {
             console.error("Error creating matchup:", err);
-            alert("Failed to create debate: " + err.message);
+            alert("Failed to create matchup. Please try again.");
             setIsSubmitting(false);
         }
     };
 
-    // ✅ NEW: Revive Logic
+    // ✅ NEW: Revive Existing Matchup
     const reviveMatchup = async () => {
         if (!existingMatchup) return;
         setIsSubmitting(true);
 
         try {
-            // 1. Update timestamp in DB to bring it to top of "New"
-            const { data, error } = await window.supabase
+            // Update the matchup's timestamp to bring it to the top
+            const { error } = await window.supabase
                 .from('matchups')
                 .update({ created_at: new Date().toISOString() })
-                .eq('id', existingMatchup.id)
-                .select()
-                .single();
+                .eq('id', existingMatchup.id);
 
             if (error) throw error;
 
-            // 2. Update Local State (Remove old instance, add new to top)
-            const completeMatchup = enrichMatchup(data);
+            // Refresh matchups with the revived one
+            const completeMatchup = enrichMatchup({
+                ...existingMatchup,
+                created_at: new Date().toISOString()
+            });
 
             setMatchups(prev => {
                 const filtered = prev.filter(m => m.id !== existingMatchup.id);
@@ -160,10 +176,9 @@ const CreatePage = ({
             });
 
             resetAndRedirect();
-
         } catch (err) {
             console.error("Error reviving matchup:", err);
-            alert("Failed to revive debate.");
+            alert("Failed to revive matchup. Please try again.");
             setIsSubmitting(false);
         }
     };
