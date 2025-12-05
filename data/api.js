@@ -68,7 +68,7 @@ Instructions:
 
 // Fallback analysis if API fails
 const generateFallbackAnalysis = (player1, player2) => {
-    return `${player1.name} vs ${player2.name} - Compare their 2024 stats above to see who has the edge.`;
+    return `${player1.name} vs ${player2.name} - Compare their 2025 stats above to see who has the edge.`;
 };
 
 console.log('Claude API module loaded (Concise Version)');
